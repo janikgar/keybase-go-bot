@@ -1,0 +1,5 @@
+.env
+*.exe
+!main.go
+!main_test.go
+cover.out
