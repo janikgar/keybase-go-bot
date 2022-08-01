@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/janikgar/keybase-go-bot/mocks"
 	"github.com/keybase/go-keybase-chat-bot/kbchat"
@@ -30,6 +31,28 @@ func createTextMessage(msg string) kbchat.SubscriptionMessage {
 			},
 			Content: chat1.MsgContent{
 				TypeName: "text",
+				Text: &chat1.MsgTextContent{
+					Body: msg,
+				},
+			},
+		},
+		Conversation: chat1.ConvSummary{},
+	}
+}
+
+func createNonTextMessage(msg string) kbchat.SubscriptionMessage {
+	return kbchat.SubscriptionMessage{
+		Message: chat1.MsgSummary{
+			Id: 1,
+			Channel: chat1.ChatChannel{
+				Name:        "test",
+				Public:      true,
+				MembersType: "a",
+				TopicType:   "b",
+				TopicName:   "c",
+			},
+			Content: chat1.MsgContent{
+				TypeName: "image",
 				Text: &chat1.MsgTextContent{
 					Body: msg,
 				},
@@ -78,7 +101,7 @@ func TestReadSub(t *testing.T) {
 	}
 }
 
-func captureOutput(t *testing.T, f func()) (string, error) {
+func captureOutput(t *testing.T, f func()) string {
 	var buf bytes.Buffer
 	log.SetOutput(&buf)
 
@@ -90,16 +113,18 @@ func captureOutput(t *testing.T, f func()) (string, error) {
 
 	fakeStdout, err := ioutil.ReadAll(&buf)
 	log.SetOutput(os.Stdout)
-	return string(fakeStdout), err
+
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	return string(fakeStdout)
 }
 
 func TestInitDotenv(t *testing.T) {
 	dotenv = "itdoesnotexist"
 
-	fakeStdout, err := captureOutput(t, func() { setupEnv() })
-	if err != nil {
-		t.FailNow()
-	}
+	fakeStdout := captureOutput(t, func() { setupEnv() })
 
 	require.Contains(t, fakeStdout, "could not load")
 }
@@ -116,11 +141,13 @@ func TestParseMessages(t *testing.T) {
 		{createTextMessage("test"), "test", nil, ""},
 		{createTextMessage("fail"), "fail", errors.New("fail"), ""},
 		{createTextMessage("ip"), "looking up", nil, "1.1.1.1"},
+		{createTextMessage("ip"), "message read failed", errors.New("ip"), "could not get ip address"},
+		{createNonTextMessage("nontext"), "nontext", errors.New("nontext"), "nontext"},
 	}
 
 	for _, c := range cases {
 		sub := mocks.NewSubReader(t)
-		sub.On("Read").Return(c.message, c.expectedError)
+		sub.On("Read").Return(c.message, c.expectedError).Maybe()
 
 		kbc.On("SendReply", c.message.Message.Channel, &c.message.Message.Id, c.expectedResponse).Return(
 			kbchat.SendResponse{},
@@ -139,14 +166,22 @@ func TestParseMessages(t *testing.T) {
 			Body:       body,
 		}, nil).Maybe()
 
-		if c.expectedError != nil {
-			require.Panics(t, func() { parseMessages(kbc, sub, httpReq) })
-		} else {
-			fakeStdout, err := captureOutput(t, func() { parseMessages(kbc, sub, httpReq) })
-			if err != nil {
-				fmt.Println(err.Error())
-				t.FailNow()
+		if c.expectedError != nil && c.expectedError.Error() == "ip" {
+			fmt.Println(c.expectedError.Error())
+			fakeStdout := captureOutput(t, func() { parseMessages(kbc, sub, httpReq) })
+
+			if c.expectedOutput != "" {
+				require.Contains(t, fakeStdout, c.expectedOutput)
 			}
+			require.Contains(t, fakeStdout, c.expectedError.Error())
+		} else if c.expectedError != nil {
+			fakeStdout := captureOutput(t, func() { parseMessages(kbc, sub, httpReq) })
+
+			if c.expectedOutput != "" {
+				require.Contains(t, fakeStdout, c.expectedOutput)
+			}
+		} else {
+			fakeStdout := captureOutput(t, func() { parseMessages(kbc, sub, httpReq) })
 
 			if c.expectedOutput != "" {
 				require.Contains(t, fakeStdout, c.expectedOutput)
@@ -167,4 +202,45 @@ func TestReply(t *testing.T) {
 
 	err := reply(kbc, msg, "this is a reply")
 	require.Nil(t, err)
+}
+
+func TestMainLoop(t *testing.T) {
+	httpReq := mocks.NewRequests(t)
+
+	cases := []struct {
+		sub *kbchat.Subscription
+		err error
+	}{
+		{kbchat.NewSubscription(), nil},
+		{kbchat.NewSubscription(), errors.New("fail")},
+	}
+
+	for _, c := range cases {
+		kbc := mocks.NewKeyBaseChat(t)
+		kbc.On("ListenForNewTextMessages").Return(c.sub, c.err)
+
+		fakeStdout := captureOutput(t, func() {
+			go mainLoop(kbc, httpReq)
+			func() {
+				time.Sleep(time.Second * 2)
+				reply(kbc, createTextMessage("bye"), "")
+			}()
+		})
+
+		require.Contains(t, fakeStdout, "bot started")
+		if c.err != nil {
+			fmt.Printf("expected error: %+v\n", c.err)
+			require.Contains(t, fakeStdout, "could not start subscription")
+		}
+	}
+
+}
+
+func TestMain(t *testing.T) {
+	kbLoc = "itdoesnotexist"
+
+	fakeStdout := captureOutput(t, func() { main() })
+
+	require.Contains(t, fakeStdout, "could not start")
+	require.NotPanics(t, func() { main() })
 }

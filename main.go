@@ -44,6 +44,7 @@ var dotenv = ".env"
 func setupEnv() {
 	if err := godotenv.Load(dotenv); err != nil {
 		fail("could not load .env file: %s", err.Error())
+		return
 	}
 
 	kbLoc = os.Getenv("KB_LOCATION")
@@ -86,10 +87,12 @@ func parseMessages(kbc KeyBaseChat, sub SubReader, httpReq Requests) {
 
 	if err != nil {
 		fail(err.Error())
+		return
 	}
 
 	if msg.Message.Content.Text == nil {
 		fail("no content")
+		return
 	}
 
 	body := msg.Message.Content.Text.Body
@@ -104,17 +107,20 @@ func parseMessages(kbc KeyBaseChat, sub SubReader, httpReq Requests) {
 			fail("could not get ip address: %s", err.Error())
 		}
 		reply(kbc, msg, ipAddr)
+	case "bye":
+		os.Exit(0)
 	default:
 		log.Println(input)
 	}
 }
 
-func mainLoop(kbc KeyBaseChat) {
-	httpReq = new(httpRequests)
+func mainLoop(kbc KeyBaseChat, httpReq Requests) {
+	log.Println("bot started")
 
 	sub, err := kbc.ListenForNewTextMessages()
 	if err != nil {
 		fail("could not start subscription: %s", err.Error())
+		return
 	}
 
 	for {
@@ -125,7 +131,9 @@ func mainLoop(kbc KeyBaseChat) {
 func main() {
 	if kbc, err = kbchat.Start(kbchat.RunOptions{KeybaseLocation: kbLoc}); err != nil {
 		fail("could not start: %s", err.Error())
+		return
 	}
 
-	mainLoop(kbc)
+	httpReq = new(httpRequests)
+	mainLoop(kbc, httpReq)
 }
