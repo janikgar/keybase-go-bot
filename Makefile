@@ -1,7 +1,7 @@
 test:
 	go test . -coverprofile cover.out
 
-cover:
+cover: test
 	go tool cover -html cover.out
 
 build:
@@ -9,3 +9,6 @@ build:
 
 run:
 	go run .
+
+mock:
+	mockery --all

@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -136,13 +137,16 @@ func TestParseMessages(t *testing.T) {
 		message          kbchat.SubscriptionMessage
 		expectedOutput   any
 		expectedError    error
+		expectedInput    string
 		expectedResponse string
 	}{
-		{createTextMessage("test"), "test", nil, ""},
-		{createTextMessage("fail"), "fail", errors.New("fail"), ""},
-		{createTextMessage("ip"), "looking up", nil, "1.1.1.1"},
-		{createTextMessage("ip"), "message read failed", errors.New("ip"), "could not get ip address"},
-		{createNonTextMessage("nontext"), "nontext", errors.New("nontext"), "nontext"},
+		{createTextMessage("test"), "test", nil, "", ""},
+		{createTextMessage("fail"), "fail", errors.New("fail"), "", ""},
+		{createTextMessage("ip"), "looking up", nil, "1.1.1.1", "1.1.1.1"},
+		{createTextMessage("ip"), "message read failed", errors.New("ip"), "could not get ip address", "could not get ip address"},
+		{createTextMessage("home"), "HASS says:", nil, `{"hello":"world"}`, "HASS says: \n```\nhello: world\n\n```"},
+		// {createTextMessage("home"), "error communicating with Home Assistant: failed connection", errors.New("failed connection"), "", ""},
+		{createNonTextMessage("nontext"), "nontext", errors.New("nontext"), "nontext", "nontext"},
 	}
 
 	for _, c := range cases {
@@ -156,12 +160,36 @@ func TestParseMessages(t *testing.T) {
 
 		body, bodyWrite := io.Pipe()
 		go func() {
-			fmt.Fprint(bodyWrite, c.expectedResponse)
+			fmt.Fprint(bodyWrite, c.expectedInput)
 			bodyWrite.Close()
 		}()
 
 		httpReq := mocks.NewRequests(t)
 		httpReq.On("Get", "https://api.ipify.org").Return(&http.Response{
+			StatusCode: 200,
+			Body:       body,
+		}, nil).Maybe()
+
+		hassUrl := "http://home-assistant.home.lan:8123/api/"
+
+		header := make(map[string][]string)
+		header["Authorization"] = []string{fmt.Sprintf("Bearer %s", hassApiKey)}
+
+		hassUrlAsUrl, _ := url.Parse(hassUrl)
+
+		hassRequest := &http.Request{
+			Method: "GET",
+			URL:    hassUrlAsUrl,
+		}
+
+		httpReq.On("NewRequest", "GET", hassUrl, http.NoBody).Return(hassRequest, nil).Maybe()
+
+		// req, err := httpReq.NewRequest("GET", hassUrl, http.NoBody)
+		// if err != nil {
+		// 	log.Printf("error with Home Assistant request: %s", err.Error())
+		// }
+
+		httpReq.On("Do", hassRequest).Return(&http.Response{
 			StatusCode: 200,
 			Body:       body,
 		}, nil).Maybe()

@@ -9,8 +9,8 @@ type Logger struct {
 	mock.Mock
 }
 
-// Fatalf provides a mock function with given fields: format, v
-func (_m *Logger) Fatalf(format string, v ...interface{}) {
+// Printf provides a mock function with given fields: format, v
+func (_m *Logger) Printf(format string, v ...interface{}) {
 	var _ca []interface{}
 	_ca = append(_ca, format)
 	_ca = append(_ca, v...)

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -14,12 +15,22 @@ var httpReq Requests
 
 type Requests interface {
 	Get(url string) (resp *http.Response, err error)
+	NewRequest(method string, url string, body io.Reader) (*http.Request, error)
+	Do(req *http.Request) (*http.Response, error)
 }
 
 type httpRequests struct{}
 
 func (h *httpRequests) Get(url string) (resp *http.Response, err error) {
 	return http.Get(url)
+}
+
+func (h *httpRequests) NewRequest(method string, url string, body io.Reader) (*http.Request, error) {
+	return http.NewRequest(method, url, body)
+}
+
+func (h *httpRequests) Do(req *http.Request) (*http.Response, error) {
+	return http.DefaultClient.Do(req)
 }
 
 func getUrl(httpReq Requests, url string) (string, error) {
@@ -39,18 +50,18 @@ func getUrl(httpReq Requests, url string) (string, error) {
 	return "", fmt.Errorf("error: received status code %d", resp.StatusCode)
 }
 
-func getFromHass(hassUrl string) (string, error) {
+func getFromHass(httpReq Requests, hassUrl string) (string, error) {
 	header := make(map[string][]string)
 	header["Authorization"] = []string{fmt.Sprintf("Bearer %s", hassApiKey)}
 
-	req, err := http.NewRequest("GET", hassUrl, http.NoBody)
+	req, err := httpReq.NewRequest("GET", hassUrl, http.NoBody)
 	if err != nil {
 		return "", fmt.Errorf("error with Home Assistant request: %s", err.Error())
 	}
 
 	req.Header = header
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := httpReq.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("error with Home Assistant response: %s", err.Error())
 	}

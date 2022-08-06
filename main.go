@@ -121,10 +121,11 @@ func parseMessages(kbc KeyBaseChat, sub SubReader, httpReq Requests) {
 		hassString := strings.Join(hassStrings[1:], "/")
 		hassUrl := fmt.Sprintf("http://home-assistant.home.lan:8123/api/%s", hassString)
 		fmt.Printf("hassUrl: %s\n", hassUrl)
-		hassOutput, err := getFromHass(hassUrl)
+		hassOutput, err := getFromHass(httpReq, hassUrl)
 		if err != nil {
 			fail("error communicating with Home Assistant: %s", err.Error())
 		}
+		log.Println(hassOutput)
 		reply(kbc, msg, hassOutput)
 	} else {
 		log.Println(input)
