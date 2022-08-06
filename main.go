@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -22,21 +23,22 @@ type SubReader interface {
 }
 
 type Logger interface {
-	Fatalf(format string, v ...any)
+	Printf(format string, v ...any)
 }
 
 type NativeLogger struct{}
 
-func (n NativeLogger) Fatalf(format string, v ...any) {
-	log.Fatalf(format, v...)
+func (n NativeLogger) Printf(format string, v ...any) {
+	log.Printf(format, v...)
 }
 
 var (
-	kbLoc  string
-	kbc    KeyBaseChat
-	err    error
-	logger Logger
-	fail   func(string, ...any)
+	kbLoc      string
+	kbc        KeyBaseChat
+	err        error
+	logger     Logger
+	fail       func(string, ...any)
+	hassApiKey string
 )
 
 var dotenv = ".env"
@@ -48,13 +50,13 @@ func setupEnv() {
 	}
 
 	kbLoc = os.Getenv("KB_LOCATION")
-	// hassApiKey = os.Getenv("HASS_API_KEY")
+	hassApiKey = os.Getenv("HASS_API_KEY")
 }
 
 func init() {
 	setupEnv()
 	logger = new(NativeLogger)
-	fail = logger.Fatalf
+	fail = logger.Printf
 }
 
 func readSub(sub SubReader) (kbchat.SubscriptionMessage, error) {
@@ -100,16 +102,31 @@ func parseMessages(kbc KeyBaseChat, sub SubReader, httpReq Requests) {
 
 	fmt.Printf("Input: %s\n", input)
 
-	switch input {
-	case "ip":
+	ip := regexp.MustCompile(`ip`)
+	bye := regexp.MustCompile(`bye`)
+	home := regexp.MustCompile(`home`)
+
+	fmt.Println(home.MatchString(input))
+
+	if ip.MatchString(input) {
 		ipAddr, err := getIp(httpReq)
 		if err != nil {
 			fail("could not get ip address: %s", err.Error())
 		}
 		reply(kbc, msg, ipAddr)
-	case "bye":
+	} else if bye.MatchString(input) {
 		os.Exit(0)
-	default:
+	} else if home.MatchString(input) {
+		hassStrings := strings.Split(input, " ")
+		hassString := strings.Join(hassStrings[1:], "/")
+		hassUrl := fmt.Sprintf("http://home-assistant.home.lan:8123/api/%s", hassString)
+		fmt.Printf("hassUrl: %s\n", hassUrl)
+		hassOutput, err := getFromHass(hassUrl)
+		if err != nil {
+			fail("error communicating with Home Assistant: %s", err.Error())
+		}
+		reply(kbc, msg, hassOutput)
+	} else {
 		log.Println(input)
 	}
 }

@@ -21,7 +21,7 @@ func TestGetUrl(t *testing.T) {
 		errorMatchString error
 	}{
 		{"https://api.ipify.org", 200, nil},
-		{"https://foo.bar.baz", 0, errors.New("no such host")},
+		{"https://foo.bar.baz", 0, errors.New("received status code")},
 	}
 
 	body, w := io.Pipe()
