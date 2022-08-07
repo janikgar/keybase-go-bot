@@ -94,11 +94,6 @@ func parseMessages(kbc KeyBaseChat, sub SubReader, httpReq Requests) {
 		return
 	}
 
-	// if msg.Message.Content.Text == nil {
-	// 	fail("no content")
-	// 	return
-	// }
-
 	body := msg.Message.Content.Text.Body
 	input := strings.ToLower(strings.TrimSpace(body))
 

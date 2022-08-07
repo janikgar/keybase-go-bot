@@ -262,21 +262,6 @@ func TestParseMessages(t *testing.T) {
 
 		fakeStdout := captureOutput(t, func() { parseMessages(kbc, sub, httpReq) })
 		require.Contains(t, fakeStdout, c.expectedOutput)
-
-		// if c.expectedIpError != nil {
-		// 	log.Println(fakeStdout)
-		// 	if c.expectedOutput != "" {
-		// 	}
-		// 	require.Contains(t, fakeStdout, c.expectedIpError.Error())
-		// } else if c.expectedError != nil {
-		// 	if c.expectedOutput != "" {
-		// 		require.Contains(t, fakeStdout, c.expectedOutput)
-		// 	}
-		// } else {
-		// 	if c.expectedOutput != "" {
-		// 		require.Contains(t, fakeStdout, c.expectedOutput)
-		// 	}
-		// }
 	}
 }
 
