@@ -36,7 +36,7 @@ func (h *httpRequests) Do(req *http.Request) (*http.Response, error) {
 func getUrl(httpReq Requests, url string) (string, error) {
 	resp, err := httpReq.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("error getting IP: %s", err.Error())
+		return "", fmt.Errorf("error getting document: %s", err.Error())
 	}
 	if (200 <= resp.StatusCode) && (resp.StatusCode <= 299) {
 		defer resp.Body.Close()

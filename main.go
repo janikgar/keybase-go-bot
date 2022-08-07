@@ -39,6 +39,7 @@ var (
 	logger     Logger
 	fail       func(string, ...any)
 	hassApiKey string
+	exitFunc   func(int)
 )
 
 var dotenv = ".env"
@@ -57,6 +58,7 @@ func init() {
 	setupEnv()
 	logger = new(NativeLogger)
 	fail = logger.Printf
+	exitFunc = os.Exit
 }
 
 func readSub(sub SubReader) (kbchat.SubscriptionMessage, error) {
@@ -92,21 +94,17 @@ func parseMessages(kbc KeyBaseChat, sub SubReader, httpReq Requests) {
 		return
 	}
 
-	if msg.Message.Content.Text == nil {
-		fail("no content")
-		return
-	}
+	// if msg.Message.Content.Text == nil {
+	// 	fail("no content")
+	// 	return
+	// }
 
 	body := msg.Message.Content.Text.Body
 	input := strings.ToLower(strings.TrimSpace(body))
 
-	fmt.Printf("Input: %s\n", input)
-
 	ip := regexp.MustCompile(`ip`)
 	bye := regexp.MustCompile(`bye`)
 	home := regexp.MustCompile(`home`)
-
-	fmt.Println(home.MatchString(input))
 
 	if ip.MatchString(input) {
 		ipAddr, err := getIp(httpReq)
@@ -115,12 +113,11 @@ func parseMessages(kbc KeyBaseChat, sub SubReader, httpReq Requests) {
 		}
 		reply(kbc, msg, ipAddr)
 	} else if bye.MatchString(input) {
-		os.Exit(0)
+		exitFunc(0)
 	} else if home.MatchString(input) {
 		hassStrings := strings.Split(input, " ")
 		hassString := strings.Join(hassStrings[1:], "/")
 		hassUrl := fmt.Sprintf("http://home-assistant.home.lan:8123/api/%s", hassString)
-		fmt.Printf("hassUrl: %s\n", hassUrl)
 		hassOutput, err := getFromHass(httpReq, hassUrl)
 		if err != nil {
 			fail("error communicating with Home Assistant: %s", err.Error())

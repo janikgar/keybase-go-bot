@@ -54,9 +54,6 @@ func createNonTextMessage(msg string) kbchat.SubscriptionMessage {
 			},
 			Content: chat1.MsgContent{
 				TypeName: "image",
-				Text: &chat1.MsgTextContent{
-					Body: msg,
-				},
 			},
 		},
 		Conversation: chat1.ConvSummary{},
@@ -95,11 +92,9 @@ func TestReadSub(t *testing.T) {
 		msg, err := readSub(sub)
 
 		if c.expectedSubReadErr != nil {
-			fmt.Println(err)
 			require.Equal(t, emptyMessage, msg)
 			require.Contains(t, err.Error(), c.expectedSubReadErr.Error())
 		} else if c.expectedContentErr != nil {
-			fmt.Println(err)
 			require.Equal(t, emptyMessage, msg)
 			require.Contains(t, err.Error(), c.expectedContentErr.Error())
 		} else {
@@ -139,24 +134,94 @@ func TestInitDotenv(t *testing.T) {
 func TestParseMessages(t *testing.T) {
 	kbc := mocks.NewKeyBaseChat(t)
 
+	exitFunc = func(code int) { fmt.Printf("exiting with code %d\n", code) }
+
 	cases := []struct {
-		message          kbchat.SubscriptionMessage
-		expectedOutput   any
-		expectedError    error
-		expectedInput    string
-		expectedResponse string
+		message           kbchat.SubscriptionMessage
+		expectedOutput    any
+		expectedError     error
+		expectedIpError   error
+		expectedHassError error
+		expectedInput     string
+		expectedResponse  string
 	}{
-		{createTextMessage("test"), "test", nil, "", ""},
-		{createTextMessage("fail"), "fail", errors.New("fail"), "", ""},
-		{createTextMessage("ip"), "looking up", nil, "1.1.1.1", "1.1.1.1"},
-		{createTextMessage("ip"), "message read failed", errors.New("ip"), "could not get ip address", "could not get ip address"},
-		{createTextMessage("home"), "HASS says:", nil, `{"hello":"world"}`, "HASS says: \n```\nhello: world\n\n```"},
-		// {createTextMessage("home"), "error communicating with Home Assistant: failed connection", errors.New("failed connection"), "", ""},
-		{createNonTextMessage("nontext"), "nontext", errors.New("nontext"), "nontext", "nontext"},
+		{
+			createTextMessage("test"),
+			"test",
+			nil,
+			nil,
+			nil,
+			"",
+			"",
+		},
+		{
+			createTextMessage("fail"),
+			"fail",
+			errors.New("fail"),
+			nil,
+			nil,
+			"",
+			"",
+		},
+		{
+			createTextMessage("ip"),
+			"looking up",
+			nil,
+			nil,
+			nil,
+			"1.1.1.1",
+			"1.1.1.1",
+		},
+		{
+			createTextMessage("ip"),
+			"",
+			nil,
+			errors.New("ip"),
+			nil,
+			"could not get ip address",
+			"could not get ip address: error getting document: ip",
+		},
+		{
+			createNonTextMessage("nontext"),
+			"not text",
+			nil,
+			nil,
+			nil,
+			"nontext",
+			"not text",
+		},
+		{
+			createTextMessage("home"),
+			"HASS says:",
+			nil,
+			nil,
+			nil,
+			`{"hello":"world"}`,
+			"HASS says: \n```\nhello: world\n\n```",
+		},
+		{
+			createTextMessage("home"),
+			"error communicating with Home Assistant: error with Home Assistant request: hassError",
+			nil,
+			nil,
+			errors.New("hassError"),
+			`{"hello":"world"}`,
+			"HASS says: \n```\nhello: world\n\n```",
+		},
+		{
+			createTextMessage("bye"),
+			"",
+			nil,
+			nil,
+			nil,
+			"",
+			"",
+		},
 	}
 
 	for _, c := range cases {
 		sub := mocks.NewSubReader(t)
+
 		sub.On("Read").Return(c.message, c.expectedError).Maybe()
 
 		kbc.On("SendReply", c.message.Message.Channel, &c.message.Message.Id, c.expectedResponse).Return(
@@ -174,7 +239,7 @@ func TestParseMessages(t *testing.T) {
 		httpReq.On("Get", "https://api.ipify.org").Return(&http.Response{
 			StatusCode: 200,
 			Body:       body,
-		}, nil).Maybe()
+		}, c.expectedIpError).Maybe()
 
 		hassUrl := "http://home-assistant.home.lan:8123/api/"
 
@@ -188,40 +253,30 @@ func TestParseMessages(t *testing.T) {
 			URL:    hassUrlAsUrl,
 		}
 
-		httpReq.On("NewRequest", "GET", hassUrl, http.NoBody).Return(hassRequest, nil).Maybe()
-
-		// req, err := httpReq.NewRequest("GET", hassUrl, http.NoBody)
-		// if err != nil {
-		// 	log.Printf("error with Home Assistant request: %s", err.Error())
-		// }
+		httpReq.On("NewRequest", "GET", hassUrl, http.NoBody).Return(hassRequest, c.expectedHassError).Maybe()
 
 		httpReq.On("Do", hassRequest).Return(&http.Response{
 			StatusCode: 200,
 			Body:       body,
 		}, nil).Maybe()
 
-		if c.expectedError != nil && c.expectedError.Error() == "ip" {
-			fmt.Println(c.expectedError.Error())
-			fakeStdout := captureOutput(t, func() { parseMessages(kbc, sub, httpReq) })
+		fakeStdout := captureOutput(t, func() { parseMessages(kbc, sub, httpReq) })
+		require.Contains(t, fakeStdout, c.expectedOutput)
 
-			if c.expectedOutput != "" {
-				require.Contains(t, fakeStdout, c.expectedOutput)
-			}
-			require.Contains(t, fakeStdout, c.expectedError.Error())
-		} else if c.expectedError != nil {
-			fakeStdout := captureOutput(t, func() { parseMessages(kbc, sub, httpReq) })
-
-			if c.expectedOutput != "" {
-				require.Contains(t, fakeStdout, c.expectedOutput)
-			}
-		} else {
-			fakeStdout := captureOutput(t, func() { parseMessages(kbc, sub, httpReq) })
-
-			if c.expectedOutput != "" {
-				require.Contains(t, fakeStdout, c.expectedOutput)
-			}
-		}
-
+		// if c.expectedIpError != nil {
+		// 	log.Println(fakeStdout)
+		// 	if c.expectedOutput != "" {
+		// 	}
+		// 	require.Contains(t, fakeStdout, c.expectedIpError.Error())
+		// } else if c.expectedError != nil {
+		// 	if c.expectedOutput != "" {
+		// 		require.Contains(t, fakeStdout, c.expectedOutput)
+		// 	}
+		// } else {
+		// 	if c.expectedOutput != "" {
+		// 		require.Contains(t, fakeStdout, c.expectedOutput)
+		// 	}
+		// }
 	}
 }
 
@@ -279,7 +334,6 @@ func TestMainLoop(t *testing.T) {
 
 		require.Contains(t, fakeStdout, "bot started")
 		if c.err != nil {
-			fmt.Printf("expected error: %+v\n", c.err)
 			require.Contains(t, fakeStdout, "could not start subscription")
 		}
 	}
