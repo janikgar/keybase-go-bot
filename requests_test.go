@@ -56,18 +56,29 @@ func TestGetIp(t *testing.T) {
 		w.Close()
 	}()
 
-	httpReq.On("Get", "https://api.ipify.org").Return(&http.Response{
-		StatusCode: 200,
-		Body:       body,
-	}, nil)
-
-	ipPattern := regexp.MustCompile(`\d+\.\d+\.\d+\.\d+`)
-	ipAddr, err := getIp(httpReq)
-	if err != nil {
-		t.FailNow()
+	cases := []struct {
+		httpError error
+	}{
+		{nil},
+		{errors.New("no such domain")},
 	}
 
-	require.True(t, ipPattern.Match([]byte(ipAddr)))
+	for _, c := range cases {
+		httpReq.On("Get", "https://api.ipify.org").Return(&http.Response{
+			StatusCode: 200,
+			Body:       body,
+		}, c.httpError)
+
+		ipPattern := regexp.MustCompile(`\d+\.\d+\.\d+\.\d+`)
+		ipAddr, err := getIp(httpReq)
+		if c.httpError != nil {
+			require.NotNil(t, err)
+		} else {
+			require.True(t, ipPattern.Match([]byte(ipAddr)))
+		}
+
+	}
+
 }
 
 func TestGetFromHass(t *testing.T) {
