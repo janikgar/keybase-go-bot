@@ -226,16 +226,32 @@ func TestParseMessages(t *testing.T) {
 }
 
 func TestReply(t *testing.T) {
-	kbc := mocks.NewKeyBaseChat(t)
 	msg := createTextMessage("reply to this")
 
-	kbc.On("SendReply", msg.Message.Channel, &msg.Message.Id, "this is a reply").Return(
-		kbchat.SendResponse{},
-		nil,
-	)
+	cases := []struct {
+		expectedError error
+		finalError    error
+	}{
+		{nil, nil},
+		{errors.New("replyError"), errors.New("error sending reply: replyError")},
+	}
 
-	err := reply(kbc, msg, "this is a reply")
-	require.Nil(t, err)
+	for _, c := range cases {
+		kbc := mocks.NewKeyBaseChat(t)
+		kbc.On("SendReply", msg.Message.Channel, &msg.Message.Id, "this is a reply").Return(
+			kbchat.SendResponse{},
+			c.expectedError,
+		)
+
+		err := reply(kbc, msg, "this is a reply")
+
+		if c.finalError != nil {
+			require.Equal(t, c.finalError.Error(), err.Error())
+		} else {
+			require.Nil(t, err)
+		}
+	}
+
 }
 
 func TestMainLoop(t *testing.T) {
