@@ -78,24 +78,30 @@ func TestReadSub(t *testing.T) {
 	emptyMessage := kbchat.SubscriptionMessage{}
 
 	cases := []struct {
-		msg         kbchat.SubscriptionMessage
-		expectedMsg kbchat.SubscriptionMessage
-		err         error
+		msg                kbchat.SubscriptionMessage
+		expectedMsg        kbchat.SubscriptionMessage
+		expectedSubReadErr error
+		expectedContentErr error
 	}{
-		{testMessage, testMessage, nil},
-		{testMessage, emptyMessage, errors.New("test")},
-		{nonTextMessage, emptyMessage, errors.New("not text")},
+		{testMessage, testMessage, nil, nil},
+		{testMessage, emptyMessage, errors.New("test"), nil},
+		{nonTextMessage, emptyMessage, nil, errors.New("not text")},
 	}
 
 	for _, c := range cases {
 		sub := mocks.NewSubReader(t)
-		sub.On("Read").Return(c.msg, c.err)
+		sub.On("Read").Return(c.msg, c.expectedSubReadErr)
 
 		msg, err := readSub(sub)
 
-		if err != nil {
+		if c.expectedSubReadErr != nil {
+			fmt.Println(err)
 			require.Equal(t, emptyMessage, msg)
-			require.Contains(t, err.Error(), c.err.Error())
+			require.Contains(t, err.Error(), c.expectedSubReadErr.Error())
+		} else if c.expectedContentErr != nil {
+			fmt.Println(err)
+			require.Equal(t, emptyMessage, msg)
+			require.Contains(t, err.Error(), c.expectedContentErr.Error())
 		} else {
 			require.Equal(t, c.msg.Message.Content.Text, msg.Message.Content.Text)
 		}
