@@ -67,21 +67,14 @@ func getFromHass(httpReq Requests, hassUrl string) (string, error) {
 	}
 
 	if res.StatusCode >= 200 && res.StatusCode <= 299 {
-		responseBody, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			return "", fmt.Errorf("error with Home Assistant response: %s", err.Error())
-		}
+		responseBody, _ := io.ReadAll(res.Body)
 
 		jsonResponse := make(map[string]interface{})
 		if err = json.Unmarshal(responseBody, &jsonResponse); err != nil {
 			return "", fmt.Errorf("error decoding response: %s", err)
 		}
 
-		yamlOutput, err := yaml.Marshal(jsonResponse)
-		if err != nil {
-			return "", fmt.Errorf("error assembling YAML: %s", err)
-		}
-
+		yamlOutput, _ := yaml.Marshal(jsonResponse)
 		return fmt.Sprintf("HASS says: \n```\n%s\n```", string(yamlOutput)), nil
 	}
 	return res.Status, nil

@@ -1,4 +1,7 @@
-test:
+mock:
+	mockery --all
+
+test: mock
 	go test . -coverprofile cover.out
 
 cover: test
@@ -9,6 +12,3 @@ build:
 
 run:
 	go run .
-
-mock:
-	mockery --all
