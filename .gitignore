@@ -3,3 +3,4 @@
 !main.go
 !main_test.go
 cover.out
+dist/

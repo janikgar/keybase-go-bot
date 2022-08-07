@@ -14,6 +14,27 @@ type KeyBaseChat struct {
 	mock.Mock
 }
 
+// AdvertiseCommands provides a mock function with given fields: ad
+func (_m *KeyBaseChat) AdvertiseCommands(ad kbchat.Advertisement) (kbchat.SendResponse, error) {
+	ret := _m.Called(ad)
+
+	var r0 kbchat.SendResponse
+	if rf, ok := ret.Get(0).(func(kbchat.Advertisement) kbchat.SendResponse); ok {
+		r0 = rf(ad)
+	} else {
+		r0 = ret.Get(0).(kbchat.SendResponse)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(kbchat.Advertisement) error); ok {
+		r1 = rf(ad)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListenForNewTextMessages provides a mock function with given fields:
 func (_m *KeyBaseChat) ListenForNewTextMessages() (*kbchat.Subscription, error) {
 	ret := _m.Called()

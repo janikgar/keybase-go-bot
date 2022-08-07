@@ -16,6 +16,7 @@ import (
 type KeyBaseChat interface {
 	ListenForNewTextMessages() (*kbchat.Subscription, error)
 	SendReply(channel chat1.ChatChannel, replyTo *chat1.MessageID, body string, args ...interface{}) (kbchat.SendResponse, error)
+	AdvertiseCommands(ad kbchat.Advertisement) (kbchat.SendResponse, error)
 }
 
 type SubReader interface {
@@ -100,6 +101,36 @@ func parseMessages(kbc KeyBaseChat, sub SubReader, httpReq Requests) {
 	ip := regexp.MustCompile(`ip`)
 	bye := regexp.MustCompile(`bye`)
 	home := regexp.MustCompile(`home`)
+
+	cmds := []chat1.UserBotCommandInput{
+		{
+			Name:        "ip",
+			Description: "Get current IP address",
+		},
+		{
+			Name:        "bye",
+			Description: "Kill the bot",
+		},
+		{
+			Name:        "home",
+			Description: "Interact with home automation",
+		},
+	}
+
+	adv := kbchat.Advertisement{
+		Alias: "j2bot",
+		Advertisements: []chat1.AdvertiseCommandAPIParam{
+			{
+				Typ:      "public",
+				Commands: cmds,
+			},
+		},
+	}
+
+	_, err = kbc.AdvertiseCommands(adv)
+	if err != nil {
+		log.Println(err)
+	}
 
 	if ip.MatchString(input) {
 		ipAddr, err := getIp(httpReq)

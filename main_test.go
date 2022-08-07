@@ -229,6 +229,20 @@ func TestParseMessages(t *testing.T) {
 			nil,
 		).Maybe()
 
+		kbc.On("AdvertiseCommands", kbchat.Advertisement{Alias: "j2bot", Advertisements: []chat1.AdvertiseCommandAPIParam{
+			{
+				Typ: "public", Commands: []chat1.UserBotCommandInput{
+					{Name: "ip", Description: "Get current IP address"},
+					{Name: "bye", Description: "Kill the bot"},
+					{Name: "home", Description: "Interact with home automation"},
+				},
+			},
+		},
+		}).Return(
+			kbchat.SendResponse{},
+			nil,
+		)
+
 		body, bodyWrite := io.Pipe()
 		go func() {
 			fmt.Fprint(bodyWrite, c.expectedInput)
