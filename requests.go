@@ -38,7 +38,7 @@ func getUrl(httpReq Requests, url string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error getting IP: %s", err.Error())
 	}
-	if (200 <= resp.StatusCode) || (resp.StatusCode <= 299) {
+	if (200 <= resp.StatusCode) && (resp.StatusCode <= 299) {
 		defer resp.Body.Close()
 		bodyData, err := ioutil.ReadAll(resp.Body)
 		if err != nil {

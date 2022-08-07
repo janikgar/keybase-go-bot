@@ -14,15 +14,30 @@ import (
 )
 
 func TestGetUrl(t *testing.T) {
-	httpReq := mocks.NewRequests(t)
-
 	cases := []struct {
-		url              string
-		status           int
-		errorMatchString error
+		url                  string
+		status               int
+		expectedRequestError error
+		expectedHTTPError    error
 	}{
-		{"https://api.ipify.org", 200, nil},
-		{"https://foo.bar.baz", 0, errors.New("received status code")},
+		{
+			"https://api.ipify.org",
+			200,
+			nil,
+			nil,
+		},
+		{
+			"https://api.ipify.org",
+			200,
+			errors.New("requestError"),
+			nil,
+		},
+		{
+			"https://foo.bar.baz",
+			404,
+			nil,
+			errors.New("error: received status code 404"),
+		},
 	}
 
 	body, w := io.Pipe()
@@ -32,15 +47,21 @@ func TestGetUrl(t *testing.T) {
 	}()
 
 	for _, c := range cases {
+		httpReq := mocks.NewRequests(t)
+
 		httpReq.On("Get", c.url).Return(&http.Response{
 			StatusCode: c.status,
 			Body:       body,
-		}, c.errorMatchString)
+		}, c.expectedRequestError)
 
 		response, err := getUrl(httpReq, c.url)
 
-		if c.errorMatchString != nil {
-			require.Contains(t, err.Error(), c.errorMatchString.Error())
+		if c.status != 200 {
+			require.Equal(t, err.Error(), c.expectedHTTPError.Error())
+			require.Equal(t, "", response)
+		} else if c.expectedRequestError != nil {
+			require.Contains(t, err.Error(), c.expectedRequestError.Error())
+			require.Equal(t, "", response)
 		} else {
 			require.NotEmpty(t, response)
 		}
