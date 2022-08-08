@@ -129,7 +129,7 @@ func parseMessages(kbc KeyBaseChat, sub SubReader, httpReq Requests) {
 
 	_, err = kbc.AdvertiseCommands(adv)
 	if err != nil {
-		log.Println(err)
+		fail("could not advertise commands: %s", err.Error())
 	}
 
 	if ip.MatchString(input) {

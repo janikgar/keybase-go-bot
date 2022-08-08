@@ -132,22 +132,22 @@ func TestInitDotenv(t *testing.T) {
 }
 
 func TestParseMessages(t *testing.T) {
-	kbc := mocks.NewKeyBaseChat(t)
-
 	exitFunc = func(code int) { fmt.Printf("exiting with code %d\n", code) }
 
 	cases := []struct {
-		message           kbchat.SubscriptionMessage
-		expectedOutput    any
-		expectedError     error
-		expectedIpError   error
-		expectedHassError error
-		expectedInput     string
-		expectedResponse  string
+		message                kbchat.SubscriptionMessage
+		expectedOutput         any
+		expectedError          error
+		expectedIpError        error
+		expectedHassError      error
+		expectedAdvertiseError error
+		expectedInput          string
+		expectedResponse       string
 	}{
 		{
 			createTextMessage("test"),
 			"test",
+			nil,
 			nil,
 			nil,
 			nil,
@@ -160,12 +160,14 @@ func TestParseMessages(t *testing.T) {
 			errors.New("fail"),
 			nil,
 			nil,
+			nil,
 			"",
 			"",
 		},
 		{
 			createTextMessage("ip"),
 			"looking up",
+			nil,
 			nil,
 			nil,
 			nil,
@@ -178,12 +180,14 @@ func TestParseMessages(t *testing.T) {
 			nil,
 			errors.New("ip"),
 			nil,
+			nil,
 			"could not get ip address",
 			"could not get ip address: error getting document: ip",
 		},
 		{
 			createNonTextMessage("nontext"),
 			"not text",
+			nil,
 			nil,
 			nil,
 			nil,
@@ -196,6 +200,7 @@ func TestParseMessages(t *testing.T) {
 			nil,
 			nil,
 			nil,
+			nil,
 			`{"hello":"world"}`,
 			"HASS says: \n```\nhello: world\n\n```",
 		},
@@ -205,6 +210,7 @@ func TestParseMessages(t *testing.T) {
 			nil,
 			nil,
 			errors.New("hassError"),
+			nil,
 			`{"hello":"world"}`,
 			"HASS says: \n```\nhello: world\n\n```",
 		},
@@ -214,12 +220,24 @@ func TestParseMessages(t *testing.T) {
 			nil,
 			nil,
 			nil,
+			nil,
+			"",
+			"",
+		},
+		{
+			createTextMessage("test"),
+			"",
+			nil,
+			nil,
+			nil,
+			errors.New("advertiseError"),
 			"",
 			"",
 		},
 	}
 
 	for _, c := range cases {
+		kbc := mocks.NewKeyBaseChat(t)
 		sub := mocks.NewSubReader(t)
 
 		sub.On("Read").Return(c.message, c.expectedError).Maybe()
@@ -240,8 +258,8 @@ func TestParseMessages(t *testing.T) {
 		},
 		}).Return(
 			kbchat.SendResponse{},
-			nil,
-		)
+			c.expectedAdvertiseError,
+		).Maybe()
 
 		body, bodyWrite := io.Pipe()
 		go func() {
@@ -275,6 +293,12 @@ func TestParseMessages(t *testing.T) {
 		}, nil).Maybe()
 
 		fakeStdout := captureOutput(t, func() { parseMessages(kbc, sub, httpReq) })
+
+		if c.expectedAdvertiseError != nil {
+			fmt.Println(fakeStdout)
+			require.Contains(t, fakeStdout, c.expectedAdvertiseError.Error())
+		}
+
 		require.Contains(t, fakeStdout, c.expectedOutput)
 	}
 }
@@ -340,10 +364,30 @@ func TestMainLoop(t *testing.T) {
 }
 
 func TestMain(t *testing.T) {
-	kbLoc = "itdoesnotexist"
+	cases := []struct {
+		kbLoc          string
+		testForHttpReq bool
+	}{
+		{"itdoesnotexist", false},
+		{"Keybase.exe", true},
+	}
 
-	fakeStdout := captureOutput(t, func() { main() })
+	for _, c := range cases {
+		kbLoc = c.kbLoc
 
-	require.Contains(t, fakeStdout, "could not start")
-	require.NotPanics(t, func() { main() })
+		if c.kbLoc == "itdoesnotexist" {
+			fakeStdout := captureOutput(t, func() { main() })
+			require.Contains(t, fakeStdout, "could not start")
+			require.NotPanics(t, func() { main() })
+		} else {
+			exitFunc = func(code int) { fmt.Printf("exited with code %d", code) }
+
+			go main()
+			func() {
+				time.Sleep(time.Second * 2)
+				reply(kbc, createTextMessage("bye"), "bye")
+			}()
+
+		}
+	}
 }
