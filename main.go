@@ -170,7 +170,11 @@ func mainLoop(kbc KeyBaseChat, httpReq Requests) {
 }
 
 func main() {
-	if kbc, err = kbchat.Start(kbchat.RunOptions{KeybaseLocation: kbLoc}); err != nil {
+	options := kbchat.RunOptions{
+		KeybaseLocation: kbLoc,
+		StartService:    true,
+	}
+	if kbc, err = kbchat.Start(options); err != nil {
 		fail("could not start: %s", err.Error())
 		return
 	}
