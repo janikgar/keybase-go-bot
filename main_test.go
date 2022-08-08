@@ -165,7 +165,7 @@ func TestParseMessages(t *testing.T) {
 			"",
 		},
 		{
-			createTextMessage("ip"),
+			createTextMessage("!ip"),
 			"looking up",
 			nil,
 			nil,
@@ -175,7 +175,7 @@ func TestParseMessages(t *testing.T) {
 			"1.1.1.1",
 		},
 		{
-			createTextMessage("ip"),
+			createTextMessage("!ip"),
 			"",
 			nil,
 			errors.New("ip"),
@@ -195,7 +195,7 @@ func TestParseMessages(t *testing.T) {
 			"not text",
 		},
 		{
-			createTextMessage("home"),
+			createTextMessage("!home"),
 			"HASS says:",
 			nil,
 			nil,
@@ -205,7 +205,7 @@ func TestParseMessages(t *testing.T) {
 			"HASS says: \n```\nhello: world\n\n```",
 		},
 		{
-			createTextMessage("home"),
+			createTextMessage("!home"),
 			"error communicating with Home Assistant: error with Home Assistant request: hassError",
 			nil,
 			nil,
@@ -215,7 +215,7 @@ func TestParseMessages(t *testing.T) {
 			"HASS says: \n```\nhello: world\n\n```",
 		},
 		{
-			createTextMessage("bye"),
+			createTextMessage("!bye"),
 			"",
 			nil,
 			nil,

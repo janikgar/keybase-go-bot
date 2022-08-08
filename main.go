@@ -98,9 +98,9 @@ func parseMessages(kbc KeyBaseChat, sub SubReader, httpReq Requests) {
 	body := msg.Message.Content.Text.Body
 	input := strings.ToLower(strings.TrimSpace(body))
 
-	ip := regexp.MustCompile(`ip`)
-	bye := regexp.MustCompile(`bye`)
-	home := regexp.MustCompile(`home`)
+	ip := regexp.MustCompile(`^!ip`)
+	bye := regexp.MustCompile(`^!bye`)
+	home := regexp.MustCompile(`^!home`)
 
 	cmds := []chat1.UserBotCommandInput{
 		{
