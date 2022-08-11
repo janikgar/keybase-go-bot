@@ -16,6 +16,7 @@ import (
 type KeyBaseChat interface {
 	ListenForNewTextMessages() (*kbchat.Subscription, error)
 	SendReply(channel chat1.ChatChannel, replyTo *chat1.MessageID, body string, args ...interface{}) (kbchat.SendResponse, error)
+	SendReplyByConvID(convID chat1.ConvIDStr, replyTo *chat1.MessageID, body string, args ...interface{}) (kbchat.SendResponse, error)
 	AdvertiseCommands(ad kbchat.Advertisement) (kbchat.SendResponse, error)
 }
 
@@ -36,6 +37,8 @@ func (n NativeLogger) Printf(format string, v ...any) {
 var (
 	kbLoc      string
 	kbc        KeyBaseChat
+	user       string
+	paperKey   string
 	err        error
 	logger     Logger
 	fail       func(string, ...any)
@@ -53,13 +56,16 @@ func setupEnv() {
 
 	kbLoc = os.Getenv("KB_LOCATION")
 	hassApiKey = os.Getenv("HASS_API_KEY")
+	user = os.Getenv("KEYBASE_USERNAME")
+	paperKey = os.Getenv("KEYBASE_PAPERKEY")
 }
 
 func init() {
-	setupEnv()
 	logger = new(NativeLogger)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	fail = logger.Printf
 	exitFunc = os.Exit
+	setupEnv()
 }
 
 func readSub(sub SubReader) (kbchat.SubscriptionMessage, error) {
@@ -76,14 +82,16 @@ func readSub(sub SubReader) (kbchat.SubscriptionMessage, error) {
 }
 
 func reply(kbc KeyBaseChat, msg kbchat.SubscriptionMessage, reply string) error {
+	logger.Printf("Reply %s\n", reply)
 	if reply == "" {
 		return nil
 	}
 
-	_, err := kbc.SendReply(msg.Message.Channel, &msg.Message.Id, reply)
+	_, err := kbc.SendReplyByConvID(msg.Message.ConvID, &msg.Message.Id, reply)
 	if err != nil {
 		return fmt.Errorf("error sending reply: %s", err.Error())
 	}
+
 	return nil
 }
 
@@ -118,11 +126,12 @@ func parseMessages(kbc KeyBaseChat, sub SubReader, httpReq Requests) {
 	}
 
 	adv := kbchat.Advertisement{
-		Alias: "j2bot",
+		Alias: "j2bot2",
 		Advertisements: []chat1.AdvertiseCommandAPIParam{
 			{
-				Typ:      "public",
+				Typ:      "teamconvs",
 				Commands: cmds,
+				TeamName: "j2home",
 			},
 		},
 	}
@@ -137,7 +146,9 @@ func parseMessages(kbc KeyBaseChat, sub SubReader, httpReq Requests) {
 		if err != nil {
 			fail("could not get ip address: %s", err.Error())
 		}
-		reply(kbc, msg, ipAddr)
+		if err := reply(kbc, msg, ipAddr); err != nil {
+			fail("could not reply: %s", err.Error())
+		}
 	} else if bye.MatchString(input) {
 		exitFunc(0)
 	} else if home.MatchString(input) {
@@ -149,7 +160,9 @@ func parseMessages(kbc KeyBaseChat, sub SubReader, httpReq Requests) {
 			fail("error communicating with Home Assistant: %s", err.Error())
 		}
 		log.Println(hassOutput)
-		reply(kbc, msg, hassOutput)
+		if err := reply(kbc, msg, hassOutput); err != nil {
+			fail("could not reply: %s", err.Error())
+		}
 	} else {
 		log.Println(input)
 	}
@@ -170,10 +183,19 @@ func mainLoop(kbc KeyBaseChat, httpReq Requests) {
 }
 
 func main() {
+
+	oneOffOpts := &kbchat.OneshotOptions{
+		Username: user,
+		PaperKey: paperKey,
+	}
+
 	options := kbchat.RunOptions{
 		KeybaseLocation: kbLoc,
 		StartService:    true,
+		Oneshot:         oneOffOpts,
+		EnableTyping:    true,
 	}
+
 	if kbc, err = kbchat.Start(options); err != nil {
 		fail("could not start: %s", err.Error())
 		return

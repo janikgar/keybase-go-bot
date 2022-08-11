@@ -82,6 +82,30 @@ func (_m *KeyBaseChat) SendReply(channel chat1.ChatChannel, replyTo *chat1.Messa
 	return r0, r1
 }
 
+// SendReplyByConvID provides a mock function with given fields: convID, replyTo, body, args
+func (_m *KeyBaseChat) SendReplyByConvID(convID chat1.ConvIDStr, replyTo *chat1.MessageID, body string, args ...interface{}) (kbchat.SendResponse, error) {
+	var _ca []interface{}
+	_ca = append(_ca, convID, replyTo, body)
+	_ca = append(_ca, args...)
+	ret := _m.Called(_ca...)
+
+	var r0 kbchat.SendResponse
+	if rf, ok := ret.Get(0).(func(chat1.ConvIDStr, *chat1.MessageID, string, ...interface{}) kbchat.SendResponse); ok {
+		r0 = rf(convID, replyTo, body, args...)
+	} else {
+		r0 = ret.Get(0).(kbchat.SendResponse)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(chat1.ConvIDStr, *chat1.MessageID, string, ...interface{}) error); ok {
+		r1 = rf(convID, replyTo, body, args...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 type mockConstructorTestingTNewKeyBaseChat interface {
 	mock.TestingT
 	Cleanup(func())

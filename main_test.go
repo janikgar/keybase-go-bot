@@ -22,7 +22,8 @@ import (
 func createTextMessage(msg string) kbchat.SubscriptionMessage {
 	return kbchat.SubscriptionMessage{
 		Message: chat1.MsgSummary{
-			Id: 1,
+			Id:     1,
+			ConvID: "testConv",
 			Channel: chat1.ChatChannel{
 				Name:        "test",
 				Public:      true,
@@ -242,14 +243,14 @@ func TestParseMessages(t *testing.T) {
 
 		sub.On("Read").Return(c.message, c.expectedError).Maybe()
 
-		kbc.On("SendReply", c.message.Message.Channel, &c.message.Message.Id, c.expectedResponse).Return(
+		kbc.On("SendReplyByConvID", c.message.Message.ConvID, &c.message.Message.Id, c.expectedResponse).Return(
 			kbchat.SendResponse{},
 			nil,
 		).Maybe()
 
-		kbc.On("AdvertiseCommands", kbchat.Advertisement{Alias: "j2bot", Advertisements: []chat1.AdvertiseCommandAPIParam{
+		kbc.On("AdvertiseCommands", kbchat.Advertisement{Alias: "j2bot2", Advertisements: []chat1.AdvertiseCommandAPIParam{
 			{
-				Typ: "public", Commands: []chat1.UserBotCommandInput{
+				Typ: "teamconvs", TeamName: "j2home", Commands: []chat1.UserBotCommandInput{
 					{Name: "ip", Description: "Get current IP address"},
 					{Name: "bye", Description: "Kill the bot"},
 					{Name: "home", Description: "Interact with home automation"},
@@ -316,7 +317,7 @@ func TestReply(t *testing.T) {
 
 	for _, c := range cases {
 		kbc := mocks.NewKeyBaseChat(t)
-		kbc.On("SendReply", msg.Message.Channel, &msg.Message.Id, "this is a reply").Return(
+		kbc.On("SendReplyByConvID", msg.Message.ConvID, &msg.Message.Id, "this is a reply").Return(
 			kbchat.SendResponse{},
 			c.expectedError,
 		)
